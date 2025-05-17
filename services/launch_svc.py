@@ -1,6 +1,6 @@
 import undetected_chromedriver as uc
 
-def launch_webdriver(headless: bool = False):
+def launch_webdriver(headless: bool = False) -> uc.Chrome:
     """
     Launch a undetected Chrome webdriver instance
     """
@@ -29,5 +29,6 @@ def launch_webdriver(headless: bool = False):
         "origin": "https://meet.google.com",
         "permissions": ["audioCapture", "videoCapture"]
     })
+    
 
     return driver

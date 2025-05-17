@@ -30,6 +30,7 @@ class MeetBotCLI:
         self.ws_thread = None
         self.commands = {
             "join": self.join_meeting,
+            "leave": self.leave_meeting,
             "mute": self.toggle_mute,
             "layout": self.change_layout,
             "screenshot": self.create_screenshot,
@@ -161,6 +162,21 @@ class MeetBotCLI:
         else:
             print(f"{Fore.RED}Error: {response.status_code}{Style.RESET_ALL}")
             print(response.json())
+
+    def leave_meeting(self, args):
+        """Leave a Google Meet meeting"""
+        if args and args[0] == "help":
+            print("Usage: leave")
+            print("Leaves the current Google Meet meeting")
+            return
+        
+        response = requests.post(f"{API_BASE_URL}/leave_meeting")
+        if response.status_code == 200:
+            print(f"{Fore.GREEN}Successfully initiated leave meeting operation{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.RED}Error: {response.status_code}{Style.RESET_ALL}")
+            print(response.json())
+            
 
     def toggle_mute(self, args):
         """Toggle the microphone mute state"""

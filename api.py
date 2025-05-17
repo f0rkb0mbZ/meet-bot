@@ -1,15 +1,15 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import uvicorn
 import undetected_chromedriver as uc
 from services.launch_svc import launch_webdriver
-from services.meet_svc import join_google_meet, toggle_mute_state, change_meeting_layout, send_chat_message, exit_meeting, list_participants
+from services.meet_svc import join_google_meet, toggle_mute_state, change_meeting_layout, send_chat_message, exit_meeting
 from contextlib import asynccontextmanager
 from faker import Faker
-import json
 import asyncio
 from datetime import datetime
+from fastapi_utils.tasks import repeat_every
+
 
 from models.models import JoinMeetingRequest, ChangeLayoutRequest, SendChatMessageRequest
 
@@ -53,6 +53,7 @@ manager = ConnectionManager()
 async def lifespan(app: FastAPI):
     global driver
     driver = launch_webdriver()
+    await check_participants()
     yield
     driver.quit()
 
@@ -96,13 +97,6 @@ async def leave_meeting_background():
         "type": "meeting_left",
         "timestamp": datetime.now().isoformat()
     })
-
-@app.get("/run_script")
-async def run_script():
-    list_participants(driver)
-    return {"message": "Script run operation started"}
-
-
 
 @app.post("/toggle_mute")
 async def toggle_mute():
@@ -168,6 +162,26 @@ async def send_message_background(request: SendChatMessageRequest):
         }
     })
 
+
+@repeat_every(seconds=15, raise_exceptions=True)
+async def check_participants():
+    print("Checking participants")
+    join_message = driver.execute_script("return window._join_message")
+    left_message = driver.execute_script("return window._left_message")
+    if join_message:
+        await manager.broadcast({
+            "type": "participant_joined",
+            "timestamp": datetime.now().isoformat(),
+            "data": {"message": join_message}
+        })
+        driver.execute_script("window._join_message = null")
+    if left_message:
+        await manager.broadcast({
+            "type": "participant_left",
+            "timestamp": datetime.now().isoformat(),
+            "data": {"message": left_message}
+        })
+        driver.execute_script("window._left_message = null")
 
 @app.websocket("/events")
 async def events_websocket(websocket: WebSocket):

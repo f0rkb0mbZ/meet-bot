@@ -7,17 +7,14 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 from models.models import Layout
+import undetected_chromedriver as uc
 
 
-def join_google_meet(driver, bot_name: str, meet_url: str):
+def join_google_meet(driver: uc.Chrome, bot_name: str, meet_url: str):
     """
     Join a Google Meet session using provided webdriver
     """
     try:
-        # Keep window on focus
-        # driver.execute_script("window.onblur = function() { window.onfocus() }")
-        # time.sleep(15)
-
         # Navigate to the Google Meet URL
         print(f"Navigating to {meet_url}")
         driver.get(meet_url)
@@ -80,14 +77,67 @@ def join_google_meet(driver, bot_name: str, meet_url: str):
         # Try "Ask to join" button
         reliable_click(
             driver,
-            (By.XPATH, "//span[contains(text(), 'Ask to join')]"),
+            (By.XPATH, "//span[contains(text(), 'Ask to join') or contains(text(), 'Join now')]"),
             None,
             "'Ask to join' button",
             max_attempts=2,
         )
         driver.save_screenshot("screenshots/ask_to_join.png")
 
-        print("Join attempt completed, waiting in the meeting...")
+        print("Join attempt completed, waiting to let in by the host...")
+
+        mutation_observer_script = """
+        // 1. Build your regex once
+        const joinedRe = /\\bjoined$/i;
+        const leftRe = /\\bhas left the meeting$/i;
+
+        // 2. Observer callback
+        function onMutations(mutationsList) {
+            for (const mutation of mutationsList) {
+                // We only care about nodes being added
+                if (mutation.type !== 'childList' || mutation.addedNodes.length === 0)
+                    continue;
+
+                for (const node of mutation.addedNodes) {
+                    // If it’s an element, grab its text; if it’s a text node, use it directly
+                    const text = (node.nodeType === Node.TEXT_NODE)
+                        ? node.nodeValue
+                        : node.textContent;
+                    if (text) {
+                        if (joinedRe.test(text.trim())) {
+                            console.log('Someone joined! Text matched “joined”:', text.trim());
+                            // fire your notification or message here…
+                            window._join_message = text.trim();
+                            return;  // stop once we’ve detected one
+                        }
+                        if (leftRe.test(text.trim())) {
+                            console.log('Someone left! Text matched “has left the meeting”:', text.trim());
+                            // fire your notification or message here…
+                            window._left_message = text.trim();
+                            return;  // stop once we’ve detected one
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Create & attach the observer
+        const observer = new MutationObserver(onMutations);
+        observer.observe(document.body || document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+        """
+        driver.execute_cdp_cmd(
+            "Runtime.evaluate",
+            {
+                "expression": mutation_observer_script,
+                "awaitPromise": False,
+                "includeCommandLineAPI": True,
+            },
+        )
+
+    # <button class="VfPpkd-LgbsSe VfPpkd-LgbsSe-OWXEXe-dgl2Hf ksBjEc lKxP2d LQeN7" jscontroller="soHxf" jsaction="click:cOuCgd; mousedown:UX7yZ; mouseup:lbsD7e; mouseenter:tfO1Yc; mouseleave:JywGue; touchstart:p6p2H; touchmove:FwuNnf; touchend:yfqBxc; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; contextmenu:mg9Pef;mlnRJb:fLiPzd" data-idom-class="ksBjEc lKxP2d LQeN7" data-mdc-dialog-action="ok" data-mdc-dialog-button-default="" data-mdc-dialog-initial-focus=""><div class="VfPpkd-Jh9lGc"></div><div class="VfPpkd-J1Ukfc-LhBDec"></div><div class="VfPpkd-RLmnJb"></div><span jsname="V67aGc" class="VfPpkd-vQzf8d">Got it</span></button>
 
     except KeyboardInterrupt:
         print("Exiting...")
@@ -128,18 +178,17 @@ def check_if_joined(driver, bot_name: str):
     return joined
 
 
-def list_participants(driver):
-    participants = driver.execute_script("""function getCurrentParticipants() {
-    // select the “Participants” list by its jsname + aria-label
-    const listEl = document.querySelector('div[role="list"][aria-label="Participants"]');
-    if (!listEl) return new Set();
-
-    // each listitem has aria-label="Name"
-    const items = Array.from(listEl.querySelectorAll('div[role="listitem"][data-participant-id]'));
-    return new Set(items.map(li => li.getAttribute('aria-label').trim()));
-    }
-    getCurrentParticipants()""")
-    print(participants)
+def clear_got_it_dialogs(driver):
+    try:
+        # Find all buttons with aria-label "Got it"
+        got_it_buttons = driver.find_elements(
+            By.XPATH, "//button[.//span[normalize-space(.)='Got it']]"
+        )
+        for button in got_it_buttons:
+            driver.execute_script("arguments[0].click();", button)
+            time.sleep(1)
+    except Exception as e:
+        print(f"Error clearing got it dialogs: {e}")
 
 
 def find_mute_status(driver):
@@ -165,6 +214,9 @@ def find_mute_status(driver):
 
 
 def toggle_mute_state(driver):
+    # Clear any "Got it" dialogs, so that elements are clickable
+    clear_got_it_dialogs(driver)
+
     # Focus on the Google Meet window
     action = ActionChains(driver)
     action.key_down(Keys.CONTROL).send_keys("d").key_up(Keys.CONTROL).perform()
@@ -176,6 +228,9 @@ def toggle_mute_state(driver):
 
 
 def change_meeting_layout(driver, layout: Layout):
+    # Clear any "Got it" dialogs, so that elements are clickable
+    clear_got_it_dialogs(driver)
+
     more_options_button = driver.find_element(
         By.XPATH,
         "//button[@aria-label='More options' and @data-use-native-focus-logic='true']",
@@ -252,6 +307,9 @@ def change_meeting_layout(driver, layout: Layout):
 
 
 def send_chat_message(driver, message: str):
+    # Clear any "Got it" dialogs, so that elements are clickable
+    clear_got_it_dialogs(driver)
+
     chat_button = WebDriverWait(driver, timeout=10).until(
         EC.element_to_be_clickable(
             (By.XPATH, "//button[@aria-label='Chat with everyone']")
