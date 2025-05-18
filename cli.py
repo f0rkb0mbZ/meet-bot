@@ -1,11 +1,12 @@
-import typer
-from typing import Optional
-import threading
-import websocket
 import json
-from rich import print
 import requests
+import threading
+import typer
+import websocket
 from enum import Enum
+from rich import print
+from typing import Optional
+
 
 class Layout(str, Enum):
     AUTO = "auto"
@@ -59,6 +60,15 @@ def toggle_mute():
         print(f"[bold red]Mute toggle operation failed: {response.status_code}[/bold red]")
 
 @app.command()
+def toggle_video():
+    """Toggle the video state of the current meeting."""
+    response = requests.post(f"{API_BASE_URL}/toggle_video")
+    if response.status_code == 200:
+        print("[green]Video toggle operation initiated[/green]")
+    else:
+        print(f"[bold red]Video toggle operation failed: {response.status_code}[/bold red]")
+
+@app.command()
 def send_message(
     message: list[str] = typer.Argument(
         None, help="Chat message to send. Can include spaces."
@@ -108,7 +118,7 @@ def console(
         WS_URL, "--ws-url", help="WebSocket server URL to connect to."
     )
 ):
-    """Launch an interactive console session with WebSocket logging."""
+    """Launch Meetbot CLI session with WebSocket logging."""
     # WebSocket event handlers
     def on_message(ws, message):
         parsed_message = json.loads(message)
@@ -136,7 +146,7 @@ def console(
     ws_thread = threading.Thread(target=ws_app.run_forever, kwargs={"reconnect": 5}, daemon=True)
     ws_thread.start()
 
-    typer.echo("\nWelcome to the interactive console. Type 'help' to see available commands, or 'exit' to quit.\n")
+    typer.echo("\nMeetbot CLI. Type 'help' to see available commands, or 'exit' to quit.\n")
     
     while True:
         try:
@@ -151,7 +161,7 @@ def console(
             break
         elif cmd.lower() in ("help", "?"):
             app(["--help"], standalone_mode=False)
-        elif cmd.lower() in ("console"):
+        elif cmd.lower() in "console":
             print("You are already in the console!")
         else:
             args = cmd.split()

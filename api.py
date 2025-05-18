@@ -1,18 +1,18 @@
+import asyncio
+import asyncio.events
+import undetected_chromedriver as uc
+import uvicorn
+from contextlib import asynccontextmanager
+from datetime import datetime
+from faker import Faker
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-import undetected_chromedriver as uc
-from services.launch_svc import launch_webdriver
-from services.meet_svc import join_google_meet, toggle_mute_state, change_meeting_layout, send_chat_message, exit_meeting
-from contextlib import asynccontextmanager
-from faker import Faker
-import asyncio
-from datetime import datetime
 from fastapi_utils.tasks import repeat_every
-import asyncio.events
-
 
 from models.models import JoinMeetingRequest, ChangeLayoutRequest, SendChatMessageRequest
+from services.launch_svc import launch_webdriver
+from services.meet_svc import join_google_meet, toggle_mute_state, change_meeting_layout, send_chat_message, \
+    exit_meeting, toggle_video_state
 
 # TODO: - Join meeting given a meeting url
 # - Mute or Unmute itself
@@ -30,6 +30,7 @@ from models.models import JoinMeetingRequest, ChangeLayoutRequest, SendChatMessa
 
 driver = None
 fake = Faker()
+
 
 class ConnectionManager:
     def __init__(self):
@@ -56,7 +57,9 @@ class ConnectionManager:
                 # Connection might be closed or broken
                 pass
 
+
 manager = ConnectionManager()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -66,7 +69,8 @@ async def lifespan(app: FastAPI):
     yield
     driver.quit()
 
-app = FastAPI(title="Selenium Single-Instance API", version="0.1.0", lifespan=lifespan)
+
+app = FastAPI(title="Meetbot API", version="0.0.1", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,6 +78,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 async def ws_broadcast(event: str, message: dict):
     try:
@@ -88,9 +93,9 @@ async def ws_broadcast(event: str, message: dict):
 
 @app.post("/join_meeting")
 async def join_meeting(request: JoinMeetingRequest, background_tasks: BackgroundTasks):
-    # Create background task
     background_tasks.add_task(join_meeting_background, request)
     return {"message": "Meet join operation started"}
+
 
 async def join_meeting_background(request: JoinMeetingRequest):
     loop = asyncio.get_event_loop()
@@ -101,10 +106,11 @@ async def join_meeting_background(request: JoinMeetingRequest):
     })
 
 
-@app.post("/leave_meeting") 
+@app.post("/leave_meeting")
 async def leave_meeting(background_tasks: BackgroundTasks):
     background_tasks.add_task(leave_meeting_background)
     return {"message": "Leave meeting operation started"}
+
 
 async def leave_meeting_background():
     loop = asyncio.get_event_loop()
@@ -113,10 +119,12 @@ async def leave_meeting_background():
         "message": "Bot left meeting"
     })
 
+
 @app.post("/toggle_mute")
 async def toggle_mute(background_tasks: BackgroundTasks):
     background_tasks.add_task(toggle_mute_background)
     return {"message": "Mute toggle operation started"}
+
 
 async def toggle_mute_background():
     loop = asyncio.get_event_loop()
@@ -125,10 +133,24 @@ async def toggle_mute_background():
         "mute_status": mute_status
     })
 
+@app.post("/toggle_video")
+async def toggle_video(background_tasks: BackgroundTasks):
+    background_tasks.add_task(toggle_video_background)
+    return {"message": "Video toggle operation started"}
+
+
+async def toggle_video_background():
+    loop = asyncio.get_event_loop()
+    video_status = await loop.run_in_executor(None, toggle_video_state, driver)
+    await ws_broadcast("video_toggled", {
+        "video_status": video_status
+    })
+
 @app.post("/change_layout")
 async def change_layout(request: ChangeLayoutRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(change_layout_background, request)
     return {"message": "Layout change operation started"}
+
 
 async def change_layout_background(request: ChangeLayoutRequest):
     loop = asyncio.get_event_loop()
@@ -137,15 +159,18 @@ async def change_layout_background(request: ChangeLayoutRequest):
         "layout": request.layout.value
     })
 
+
 @app.post("/create_screenshot")
 async def create_screenshot():
     screenshot = driver.save_screenshot("screenshots/screenshot.png")
     return {"message": "Screenshot created", "screenshot": screenshot}
 
+
 @app.post("/send_chat_message")
 async def send_message(request: SendChatMessageRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(send_message_background, request)
     return {"message": "Chat message operation started"}
+
 
 async def send_message_background(request: SendChatMessageRequest):
     loop = asyncio.get_event_loop()
@@ -155,7 +180,7 @@ async def send_message_background(request: SendChatMessageRequest):
     })
 
 
-@repeat_every(seconds=15, raise_exceptions=True)
+@repeat_every(seconds=5, raise_exceptions=True)
 async def check_participants():
     join_message = driver.execute_script("return window._join_message")
     left_message = driver.execute_script("return window._left_message")
@@ -181,7 +206,7 @@ async def check_participants():
             "data": {"message": left_message}
         })
         driver.execute_script("window._left_message = null")
-    
+
 
 @app.websocket("/events")
 async def events_websocket(websocket: WebSocket):
@@ -201,6 +226,7 @@ async def events_websocket(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
+
 if __name__ == "__main__":
     try:
         uvicorn.run(
@@ -210,6 +236,5 @@ if __name__ == "__main__":
             reload=True,
         )
     finally:
-        # Ensure driver is closed even if uvicorn has an error
         if driver:
             driver.quit()

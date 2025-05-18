@@ -2,7 +2,7 @@ import undetected_chromedriver as uc
 
 def launch_webdriver(headless: bool = False) -> uc.Chrome:
     """
-    Launch a undetected Chrome webdriver instance
+    Launch an undetected Chrome webdriver instance
     """
     options = uc.ChromeOptions()
     if headless:

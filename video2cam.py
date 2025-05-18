@@ -12,4 +12,4 @@ def loop_video_to_v4l2(input_path: str, device: str = "/dev/video0"):
     )
 
 if __name__ == "__main__":
-    loop_video_to_v4l2("bot_say_hello.mp4")
+    loop_video_to_v4l2("https://r2.snehangshu.dev/bot_say_hello.mp4")

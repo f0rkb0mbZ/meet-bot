@@ -1,13 +1,14 @@
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.by import By
-import time
 import random
-from helpers.utils import reliable_click
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.keys import Keys
-from models.models import Layout
+import time
 import undetected_chromedriver as uc
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
+from helpers.utils import reliable_click, setup_mutation_observer, clear_got_it_dialogs, find_mute_status, find_video_status
+from models.models import Layout
 
 
 def join_google_meet(driver: uc.Chrome, bot_name: str, meet_url: str):
@@ -19,42 +20,32 @@ def join_google_meet(driver: uc.Chrome, bot_name: str, meet_url: str):
         print(f"Navigating to {meet_url}")
         driver.get(meet_url)
 
-        # Wait for the page to load
+        # Waiting 30s for the page to load
         WebDriverWait(driver, 30).until(
             lambda d: d.execute_script("return document.readyState") == "complete"
         )
         print("Page loaded successfully")
-        driver.save_screenshot("screenshots/page_loaded.png")
+        driver.save_screenshot("screenshots/join_meet/1_page_loaded.png")
 
         # Add random delay
         time.sleep(random.uniform(2.5, 4.0))
 
-        # Turn off microphone with verification
-        reliable_click(
-            driver,
-            (By.XPATH, "//div[@role='button' and @aria-label='Turn off microphone']"),
-            (By.XPATH, "//div[@role='button' and @aria-label='Turn on microphone']"),
-            "mic off",
-            max_attempts=3,
-        )
-        driver.save_screenshot("screenshots/mic_off.png")
+        # Turn off microphone
+        mic_button_xpath = "//div[@role='button' and @aria-label='Turn off microphone']"
+        reliable_click(driver, (By.XPATH, mic_button_xpath))
+        print("Mic turned off")
+        driver.save_screenshot("screenshots/join_meet/2_mic_off.png")
 
-        # Turn off video with verification
-        reliable_click(
-            driver,
-            (By.XPATH, "//div[@role='button' and @aria-label='Turn off camera']"),
-            (By.XPATH, "//div[@role='button' and @aria-label='Turn on camera']"),
-            "video off",
-            max_attempts=3,
-        )
-        driver.save_screenshot("screenshots/video_off.png")
+        # Turn off video
+        video_button_xpath = "//div[@role='button' and @aria-label='Turn off camera']"
+        reliable_click(driver, (By.XPATH, video_button_xpath))
+        print("Video turned off")
+        driver.save_screenshot("screenshots/join_meet/3_video_off.png")
 
         # Click on name input field (no verification needed)
         text_box_found = reliable_click(
             driver,
             (By.XPATH, "//input[@type='text' and @placeholder='Your name']"),
-            None,
-            "name input field",
         )
 
         if text_box_found:
@@ -70,78 +61,19 @@ def join_google_meet(driver: uc.Chrome, bot_name: str, meet_url: str):
 
             time.sleep(random.uniform(0.5, 1.0))
             print("Name entered")
-            driver.save_screenshot("screenshots/name_entered.png")
+            driver.save_screenshot("screenshots/join_meet/4_name_entered.png")
 
-        # Try to find and click join button
-
-        # Try "Ask to join" button
+        # Trying "Ask to join" button or "Join now" button for rejoin
         reliable_click(
             driver,
             (By.XPATH, "//span[contains(text(), 'Ask to join') or contains(text(), 'Join now')]"),
-            None,
-            "'Ask to join' button",
-            max_attempts=2,
         )
-        driver.save_screenshot("screenshots/ask_to_join.png")
+        driver.save_screenshot("screenshots/join_meet/5_ask_to_join.png")
 
         print("Join attempt completed, waiting to let in by the host...")
 
-        mutation_observer_script = """
-        // 1. Build your regex once
-        const joinedRe = /\\bjoined$/i;
-        const leftRe = /\\bhas left the meeting$/i;
-
-        // 2. Observer callback
-        function onMutations(mutationsList) {
-            for (const mutation of mutationsList) {
-                // We only care about nodes being added
-                if (mutation.type !== 'childList' || mutation.addedNodes.length === 0)
-                    continue;
-
-                for (const node of mutation.addedNodes) {
-                    // If it’s an element, grab its text; if it’s a text node, use it directly
-                    const text = (node.nodeType === Node.TEXT_NODE)
-                        ? node.nodeValue
-                        : node.textContent;
-                    if (text) {
-                        if (joinedRe.test(text.trim())) {
-                            console.log('Someone joined! Text matched “joined”:', text.trim());
-                            // fire your notification or message here…
-                            window._join_message = text.trim();
-                            return;  // stop once we’ve detected one
-                        }
-                        if (leftRe.test(text.trim())) {
-                            console.log('Someone left! Text matched “has left the meeting”:', text.trim());
-                            // fire your notification or message here…
-                            window._left_message = text.trim();
-                            return;  // stop once we’ve detected one
-                        }   
-                    }
-                    if (node.tagName === 'BUTTON' && node.getAttribute('aria-label') === 'Meeting details') {
-                        console.log('Meeting details button found!');
-                        // fire your notification or message here…
-                        window._join_accepted = true;
-                        return;  // stop once we’ve detected one
-                    }
-                }
-            }
-        }
-
-        // 3. Create & attach the observer
-        const observer = new MutationObserver(onMutations);
-        observer.observe(document.body || document.documentElement, {
-            childList: true,
-            subtree: true
-        });
-        """
-        driver.execute_cdp_cmd(
-            "Runtime.evaluate",
-            {
-                "expression": mutation_observer_script,
-                "awaitPromise": False,
-                "includeCommandLineAPI": True,
-            },
-        )
+        # Setup JS mutation observer to detect when the bot is accepted by the host, participant joined or left etc.
+        setup_mutation_observer(driver)
 
     except KeyboardInterrupt:
         print("Exiting...")
@@ -182,41 +114,6 @@ def check_if_joined(driver, bot_name: str):
     return joined
 
 
-def clear_got_it_dialogs(driver):
-    try:
-        # Find all buttons with aria-label "Got it"
-        got_it_buttons = driver.find_elements(
-            By.XPATH, "//button[.//span[normalize-space(.)='Got it']]"
-        )
-        for button in got_it_buttons:
-            driver.execute_script("arguments[0].click();", button)
-            time.sleep(1)
-    except Exception as e:
-        print(f"Error clearing got it dialogs: {e}")
-
-
-def find_mute_status(driver):
-    # Check which button is present to determine mic status
-    try:
-        # Use find_elements which doesn't throw exceptions
-        mic_off_buttons = driver.find_elements(
-            By.XPATH, "//button[@aria-label='Turn off microphone']"
-        )
-        mic_on_buttons = driver.find_elements(
-            By.XPATH, "//button[@aria-label='Turn on microphone']"
-        )
-
-        if len(mic_off_buttons) > 0:
-            return "unmuted"  # Microphone is on (turn off button is visible)
-        elif len(mic_on_buttons) > 0:
-            return "muted"  # Microphone is off (turn on button is visible)
-        else:
-            return "unknown"  # Neither button found
-    except Exception as e:
-        print(f"Error checking mute status: {e}")
-        return "unknown"
-
-
 def toggle_mute_state(driver):
     # Clear any "Got it" dialogs, so that elements are clickable
     clear_got_it_dialogs(driver)
@@ -231,6 +128,20 @@ def toggle_mute_state(driver):
     return find_mute_status(driver)
 
 
+def toggle_video_state(driver):
+    # Clear any "Got it" dialogs, so that elements are clickable
+    clear_got_it_dialogs(driver)
+
+    # Focus on the Google Meet window
+    action = ActionChains(driver)
+    action.key_down(Keys.CONTROL).send_keys("e").key_up(Keys.CONTROL).perform()
+
+    # Allow time for the UI to update
+    time.sleep(1)
+
+    return find_video_status(driver)
+
+
 def change_meeting_layout(driver, layout: Layout):
     # Clear any "Got it" dialogs, so that elements are clickable
     clear_got_it_dialogs(driver)
@@ -241,7 +152,7 @@ def change_meeting_layout(driver, layout: Layout):
     )
     more_options_button.click()
     time.sleep(1)
-    driver.save_screenshot("screenshots/more_options_menu.png")
+    driver.save_screenshot("screenshots/change_layout/1_more_options_menu.png")
 
     menu = WebDriverWait(driver, timeout=10).until(
         EC.presence_of_element_located((By.XPATH, "//ul[@aria-label='Call options']"))
@@ -269,7 +180,7 @@ def change_meeting_layout(driver, layout: Layout):
         # Click on "Change layout" option
         layout_option.click()
         time.sleep(1)
-    driver.save_screenshot("screenshots/change_layout_menu.png")
+    driver.save_screenshot("screenshots/change_layout/2_change_layout_menu.png")
 
     layout_radiogroup = WebDriverWait(driver, timeout=10).until(
         EC.presence_of_element_located(
@@ -294,7 +205,7 @@ def change_meeting_layout(driver, layout: Layout):
                 radio.click()
                 print(f"Changed layout to {layout_name}")
                 time.sleep(1)
-                driver.save_screenshot(f"screenshots/layout_{layout_name.lower()}.png")
+                driver.save_screenshot(f"screenshots/change_layout/3_layout_{layout_name.lower()}.png")
                 found = True
                 break
 
@@ -307,7 +218,7 @@ def change_meeting_layout(driver, layout: Layout):
     action = ActionChains(driver)
     action.key_down(Keys.ESCAPE).key_up(Keys.ESCAPE).perform()
     time.sleep(1)
-    driver.save_screenshot("screenshots/close_button.png")
+    driver.save_screenshot("screenshots/change_layout/4_close_button.png")
 
 
 def send_chat_message(driver, message: str):
@@ -322,7 +233,7 @@ def send_chat_message(driver, message: str):
     chat_button.click()
     print("Chat button clicked")
     time.sleep(2)
-    driver.save_screenshot("screenshots/chat_button.png")
+    driver.save_screenshot("screenshots/send_chat_message/1_chat_button.png")
 
     chat_input = WebDriverWait(driver, timeout=10).until(
         EC.presence_of_element_located(
@@ -335,7 +246,7 @@ def send_chat_message(driver, message: str):
     chat_input.send_keys(Keys.ENTER)
     print("Message sent")
     time.sleep(2)
-    driver.save_screenshot("screenshots/message_sent.png")
+    driver.save_screenshot("screenshots/send_chat_message/2_message_sent.png")
 
     action = ActionChains(driver)
     action.key_down(Keys.ESCAPE).key_up(Keys.ESCAPE).perform()
@@ -346,10 +257,9 @@ def exit_meeting(driver):
     # Clear any "Got it" dialogs, so that elements are clickable
     clear_got_it_dialogs(driver)
 
-
     leave_button = WebDriverWait(driver, timeout=10).until(
         EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Leave call']"))
     )
     leave_button.click()
     time.sleep(1)
-    driver.save_screenshot("screenshots/leave_button.png")
+    driver.save_screenshot("screenshots/leave_meeting/1_leave_button.png")
