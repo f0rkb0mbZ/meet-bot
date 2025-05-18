@@ -58,21 +58,17 @@ sudo apt-get install -y ffmpeg
 echo -e "[Installing Google Chrome]\n"
 wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 sudo apt-get install -y ./google-chrome-stable_current_amd64.deb
+rm google-chrome-stable_current_amd64.deb
 
 # Install Miniconda
 echo -e "[Installing Miniconda]\n"
 wget https://repo.anaconda.com/miniconda/Miniconda3-py312_25.3.1-1-Linux-x86_64.sh
 chmod +x Miniconda3-py312_25.3.1-1-Linux-x86_64.sh
 bash Miniconda3-py312_25.3.1-1-Linux-x86_64.sh -b -u -p ~/miniconda3
+rm Miniconda3-py312_25.3.1-1-Linux-x86_64.sh
 $HOME/miniconda3/bin/conda init bash --quiet
 source ~/.bashrc
 
-# Install requirements
-echo -e "[Installing python requirements]\n"
-pip install uv
-uv pip install -r requirements.txt
-
 echo -e "[Setup complete]\n"
-
 echo -e "[Rebooting]\n"
 sudo reboot

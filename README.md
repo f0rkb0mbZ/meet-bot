@@ -22,7 +22,7 @@ A google meet bot with Selenium, FastAPI and Undetected Chromedriver
 
 ## Setup
 
-Quick Install script: [configure.sh](configure.sh)
+Quick Install script: [configure.sh](configure.sh). This script covers steps 1-7, then restarts the system to load display, audio, and video. After restart, run step 8 and the system is ready to run!
 
 ### 1. Set up an Ubuntu Server 24.04 VM
 
