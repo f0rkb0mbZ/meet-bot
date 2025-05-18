@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import undetected_chromedriver as uc
@@ -9,6 +9,7 @@ from faker import Faker
 import asyncio
 from datetime import datetime
 from fastapi_utils.tasks import repeat_every
+import asyncio.events
 
 
 from models.models import JoinMeetingRequest, ChangeLayoutRequest, SendChatMessageRequest
@@ -18,6 +19,14 @@ from models.models import JoinMeetingRequest, ChangeLayoutRequest, SendChatMessa
 # - Change Layouts of the meeting
 # - Send chat messages to participants
 # - Bonus- Change to a custom background using either image or video
+# - Server to Client
+# - Start Meeting
+# - Stop Meeting
+# - Send Chat Message to participants
+# - Client to Server
+# - Meeting has Started
+# - Meeting has ended
+# - Participant has joined- Host has joined
 
 driver = None
 fake = Faker()
@@ -32,7 +41,7 @@ class ConnectionManager:
         await websocket.send_json({
             "type": "connection_established",
             "timestamp": datetime.now().isoformat(),
-            "message": "Connected to MeetBot events stream"
+            "data": "Connected to MeetBot events stream"
         })
 
     def disconnect(self, websocket: WebSocket):
@@ -59,7 +68,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Selenium Single-Instance API", version="0.1.0", lifespan=lifespan)
 
-# CORS (if needed)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -67,107 +75,98 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+async def ws_broadcast(event: str, message: dict):
+    try:
+        await manager.broadcast({
+            "type": event,
+            "timestamp": datetime.now().isoformat(),
+            "data": message
+        })
+    except Exception as e:
+        print(f"Error broadcasting event: {e}")
+
 
 @app.post("/join_meeting")
-async def join_meeting(request: JoinMeetingRequest):
+async def join_meeting(request: JoinMeetingRequest, background_tasks: BackgroundTasks):
     # Create background task
-    asyncio.create_task(join_meeting_background(request))
+    background_tasks.add_task(join_meeting_background, request)
     return {"message": "Meet join operation started"}
 
 async def join_meeting_background(request: JoinMeetingRequest):
-    join_google_meet(driver, request.bot_name, request.meeting_url)
-    # Broadcast event when complete
-    await manager.broadcast({
-        "type": "meeting_joined",
-        "timestamp": datetime.now().isoformat(),
-        "data": {
-            "meeting_url": request.meeting_url,
-            "bot_name": request.bot_name
-        }
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, join_google_meet, driver, request.bot_name, request.meeting_url)
+    await ws_broadcast("meeting_joined", {
+        "meeting_url": request.meeting_url,
+        "bot_name": request.bot_name
     })
 
-@app.post("/leave_meeting")
-async def leave_meeting():
-    asyncio.create_task(leave_meeting_background())
+
+@app.post("/leave_meeting") 
+async def leave_meeting(background_tasks: BackgroundTasks):
+    background_tasks.add_task(leave_meeting_background)
     return {"message": "Leave meeting operation started"}
 
 async def leave_meeting_background():
-    exit_meeting(driver)
-    await manager.broadcast({
-        "type": "meeting_left",
-        "timestamp": datetime.now().isoformat()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, exit_meeting, driver)
+    await ws_broadcast("meeting_left", {
+        "message": "Bot left meeting"
     })
 
 @app.post("/toggle_mute")
-async def toggle_mute():
-    # Create background task
-    asyncio.create_task(toggle_mute_background())
+async def toggle_mute(background_tasks: BackgroundTasks):
+    background_tasks.add_task(toggle_mute_background)
     return {"message": "Mute toggle operation started"}
 
 async def toggle_mute_background():
-    mute_status = toggle_mute_state(driver)
-    # Broadcast event when complete
-    await manager.broadcast({
-        "type": "mute_toggled",
-        "timestamp": datetime.now().isoformat(),
-        "data": {
-            "mute_status": mute_status
-        }
+    loop = asyncio.get_event_loop()
+    mute_status = await loop.run_in_executor(None, toggle_mute_state, driver)
+    await ws_broadcast("mute_toggled", {
+        "mute_status": mute_status
     })
 
 @app.post("/change_layout")
-async def change_layout(request: ChangeLayoutRequest):
-    # Create background task
-    asyncio.create_task(change_layout_background(request))
+async def change_layout(request: ChangeLayoutRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(change_layout_background, request)
     return {"message": "Layout change operation started"}
 
 async def change_layout_background(request: ChangeLayoutRequest):
-    change_meeting_layout(driver, request.layout)
-    # Broadcast event when complete
-    await manager.broadcast({
-        "type": "layout_changed",
-        "timestamp": datetime.now().isoformat(),
-        "data": {
-            "layout": request.layout
-        }
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, change_meeting_layout, driver, request.layout)
+    await ws_broadcast("layout_changed", {
+        "layout": request.layout.value
     })
 
-@app.get("/create_screenshot")
+@app.post("/create_screenshot")
 async def create_screenshot():
     screenshot = driver.save_screenshot("screenshots/screenshot.png")
-    # Broadcast event
-    await manager.broadcast({
-        "type": "screenshot_created",
-        "timestamp": datetime.now().isoformat(),
-        "data": {
-            "path": "screenshots/screenshot.png"
-        }
-    })
     return {"message": "Screenshot created", "screenshot": screenshot}
 
 @app.post("/send_chat_message")
-async def send_message(request: SendChatMessageRequest):
-    # Create background task
-    asyncio.create_task(send_message_background(request))
+async def send_message(request: SendChatMessageRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(send_message_background, request)
     return {"message": "Chat message operation started"}
 
 async def send_message_background(request: SendChatMessageRequest):
-    send_chat_message(driver, request.message)
-    # Broadcast event when complete
-    await manager.broadcast({
-        "type": "chat_message_sent",
-        "timestamp": datetime.now().isoformat(),
-        "data": {
-            "message": request.message
-        }
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, send_chat_message, driver, request.message)
+    await ws_broadcast("chat_message_sent", {
+        "message": request.message
     })
 
 
 @repeat_every(seconds=15, raise_exceptions=True)
 async def check_participants():
-    print("Checking participants")
     join_message = driver.execute_script("return window._join_message")
     left_message = driver.execute_script("return window._left_message")
+    join_accepted = driver.execute_script("return window._join_accepted")
+    if join_accepted:
+        await manager.broadcast({
+            "type": "bot_accepted",
+            "timestamp": datetime.now().isoformat(),
+            "data": {"message": "Bot accepted by host"}
+        })
+        driver.execute_script("window._join_accepted = null")
     if join_message:
         await manager.broadcast({
             "type": "participant_joined",
@@ -182,6 +181,7 @@ async def check_participants():
             "data": {"message": left_message}
         })
         driver.execute_script("window._left_message = null")
+    
 
 @app.websocket("/events")
 async def events_websocket(websocket: WebSocket):

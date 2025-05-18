@@ -115,7 +115,13 @@ def join_google_meet(driver: uc.Chrome, bot_name: str, meet_url: str):
                             // fire your notification or message here…
                             window._left_message = text.trim();
                             return;  // stop once we’ve detected one
-                        }
+                        }   
+                    }
+                    if (node.tagName === 'BUTTON' && node.getAttribute('aria-label') === 'Meeting details') {
+                        console.log('Meeting details button found!');
+                        // fire your notification or message here…
+                        window._join_accepted = true;
+                        return;  // stop once we’ve detected one
                     }
                 }
             }
@@ -136,8 +142,6 @@ def join_google_meet(driver: uc.Chrome, bot_name: str, meet_url: str):
                 "includeCommandLineAPI": True,
             },
         )
-
-    # <button class="VfPpkd-LgbsSe VfPpkd-LgbsSe-OWXEXe-dgl2Hf ksBjEc lKxP2d LQeN7" jscontroller="soHxf" jsaction="click:cOuCgd; mousedown:UX7yZ; mouseup:lbsD7e; mouseenter:tfO1Yc; mouseleave:JywGue; touchstart:p6p2H; touchmove:FwuNnf; touchend:yfqBxc; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; contextmenu:mg9Pef;mlnRJb:fLiPzd" data-idom-class="ksBjEc lKxP2d LQeN7" data-mdc-dialog-action="ok" data-mdc-dialog-button-default="" data-mdc-dialog-initial-focus=""><div class="VfPpkd-Jh9lGc"></div><div class="VfPpkd-J1Ukfc-LhBDec"></div><div class="VfPpkd-RLmnJb"></div><span jsname="V67aGc" class="VfPpkd-vQzf8d">Got it</span></button>
 
     except KeyboardInterrupt:
         print("Exiting...")
@@ -339,6 +343,10 @@ def send_chat_message(driver, message: str):
 
 
 def exit_meeting(driver):
+    # Clear any "Got it" dialogs, so that elements are clickable
+    clear_got_it_dialogs(driver)
+
+
     leave_button = WebDriverWait(driver, timeout=10).until(
         EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Leave call']"))
     )
