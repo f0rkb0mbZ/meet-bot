@@ -4,7 +4,6 @@ import undetected_chromedriver as uc
 import uvicorn
 from contextlib import asynccontextmanager
 from datetime import datetime
-from faker import Faker
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
@@ -29,8 +28,6 @@ from services.meet_svc import join_google_meet, toggle_mute_state, change_meetin
 # - Participant has joined- Host has joined
 
 driver = None
-fake = Faker()
-
 
 class ConnectionManager:
     def __init__(self):
@@ -100,7 +97,7 @@ async def join_meeting(request: JoinMeetingRequest, background_tasks: Background
 async def join_meeting_background(request: JoinMeetingRequest):
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, join_google_meet, driver, request.bot_name, request.meeting_url)
-    await ws_broadcast("meeting_joined", {
+    await ws_broadcast("meeting_join_request", {
         "meeting_url": request.meeting_url,
         "bot_name": request.bot_name
     })

@@ -1,6 +1,6 @@
 # Google Meet Bot
 
-A google meet bot with Selenium, FastAPI and Undetected Chromedriver
+A google meet bot with Selenium, FastAPI and Undetected Chromedriver, with a typer CLI and some websocket magic✨!
 
 ## Features
 
@@ -19,6 +19,9 @@ A google meet bot with Selenium, FastAPI and Undetected Chromedriver
 - ✅ Participant has left the meeting
 - ✅ Completion events for all the server commands
 
+### Video Demo
+
+[![alt text](https://r2.snehangshu.dev/meetbot-demo-thumbnail.jpg)](https://r2.snehangshu.dev/meetbot-demo.mp4)
 
 ## Setup
 
