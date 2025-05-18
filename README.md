@@ -21,7 +21,7 @@ A google meet bot with Selenium, FastAPI and Undetected Chromedriver, with a typ
 
 ### Video Demo
 
-[![alt text](https://r2.snehangshu.dev/meetbot-demo-thumbnail.jpg)](https://r2.snehangshu.dev/meetbot-demo.mp4)
+[![meetbot-demo](https://r2.snehangshu.dev/meetbot-demo-thumbnail.jpg)](https://r2.snehangshu.dev/meetbot-demo.mp4)
 
 ## Setup
 
