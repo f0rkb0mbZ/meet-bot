@@ -1,6 +1,9 @@
 import ffmpeg
 
 def loop_video_to_v4l2(input_path: str, device: str = "/dev/video0"):
+    """
+    Streams a video file to a v4l2 device in an infinite loop.
+    """
     (
         ffmpeg
         .input(input_path, stream_loop=-1, re=None)

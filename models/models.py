@@ -5,7 +5,6 @@ class JoinMeetingRequest(BaseModel):
     meeting_url: str
     bot_name: str
 
-
 class Layout(Enum):
     AUTO = "auto"
     TILED = "tiled"

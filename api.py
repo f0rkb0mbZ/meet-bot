@@ -13,20 +13,6 @@ from services.launch_svc import launch_webdriver
 from services.meet_svc import join_google_meet, toggle_mute_state, change_meeting_layout, send_chat_message, \
     exit_meeting, toggle_video_state
 
-# TODO: - Join meeting given a meeting url
-# - Mute or Unmute itself
-# - Change Layouts of the meeting
-# - Send chat messages to participants
-# - Bonus- Change to a custom background using either image or video
-# - Server to Client
-# - Start Meeting
-# - Stop Meeting
-# - Send Chat Message to participants
-# - Client to Server
-# - Meeting has Started
-# - Meeting has ended
-# - Participant has joined- Host has joined
-
 driver = None
 
 class ConnectionManager:
@@ -50,9 +36,8 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except Exception:
-                # Connection might be closed or broken
-                pass
+            except Exception as e:
+                print(f"Error broadcasting message: {e}")
 
 
 manager = ConnectionManager()
@@ -213,7 +198,6 @@ async def events_websocket(websocket: WebSocket):
     """
     await manager.connect(websocket)
     try:
-        # Send a heartbeat every 30 seconds to keep the connection alive
         while True:
             await asyncio.sleep(30)
             await websocket.send_json({

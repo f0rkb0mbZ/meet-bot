@@ -4,20 +4,19 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from typing import Tuple
+import undetected_chromedriver as uc
 
 
-def reliable_click(driver, target_locator, wait_time=10):
+def reliable_click(driver: uc.Chrome, target_locator: Tuple[By, str], wait_time: int = 10) -> bool:
+    """
+    Click element with actionchains or JavaScript, whichever works
+    """
     try:        
         # Find the element
         element = WebDriverWait(driver, wait_time).until(
             EC.element_to_be_clickable(target_locator)
         )
-        
-        # Scroll into view
-        driver.execute_script(
-            "arguments[0].scrollIntoView({block: 'center'});", element
-        )
-        time.sleep(random.uniform(0.2, 0.5))
         
         # Try ActionChains click
         try:
@@ -37,13 +36,17 @@ def reliable_click(driver, target_locator, wait_time=10):
         return False
 
 
-def setup_mutation_observer(driver) -> None:
+def setup_mutation_observer(driver: uc.Chrome) -> None:
+    """
+    Sets up a JS mutation observer to monitor DOM changes. 
+    Monitors for participants joining or leaving meetings, and when the bot is accepted into the meeting.
+    """
     mutation_observer_script = """
-    // 1. Build your regex once
+    // Regex definitions for join / leave toast notifications
     const joinedRe = /\\bjoined$/i;
     const leftRe = /\\bhas left the meeting$/i;
 
-    // 2. Observer callback
+    // callback function for mutation observer
     function onMutations(mutationsList) {
         for (const mutation of mutationsList) {
             // We only care about nodes being added
@@ -58,28 +61,25 @@ def setup_mutation_observer(driver) -> None:
                 if (text) {
                     if (joinedRe.test(text.trim())) {
                         console.log('Someone joined! Text matched "joined":', text.trim());
-                        // fire your notification or message here…
-                        window._join_message = text.trim();
-                        return;  // stop once we've detected one
+                        window._join_message = text.trim(); // storing info in global window object
+                        return;
                     }
                     if (leftRe.test(text.trim())) {
                         console.log('Someone left! Text matched "has left the meeting":', text.trim());
-                        // fire your notification or message here…
-                        window._left_message = text.trim();
-                        return;  // stop once we've detected one
+                        window._left_message = text.trim(); // storing info in global window object
+                        return;
                     }   
                 }
                 if (node.tagName === 'BUTTON' && node.getAttribute('aria-label') === 'Meeting details') {
                     console.log('Meeting details button found!');
-                    // fire your notification or message here…
-                    window._join_accepted = true;
-                    return;  // stop once we've detected one
+                    window._join_accepted = true; // storing info in global window object
+                    return;
                 }
             }
         }
     }
 
-    // 3. Create & attach the observer
+    // Create & attach the observer
     const observer = new MutationObserver(onMutations);
     observer.observe(document.body || document.documentElement, {
         childList: true,
@@ -96,8 +96,10 @@ def setup_mutation_observer(driver) -> None:
     )
 
 def clear_got_it_dialogs(driver):
+    """
+    Removes any "Got it" tutorial/intro dialog boxes that might obstruct interaction with the UI
+    """
     try:
-        # Find all buttons with aria-label "Got it"
         got_it_buttons = driver.find_elements(
             By.XPATH, "//button[.//span[normalize-space(.)='Got it']]"
         )
@@ -107,7 +109,10 @@ def clear_got_it_dialogs(driver):
     except Exception as e:
         print(f"Error clearing got it dialogs: {e}")
 
-def find_mute_status(driver):
+def find_mute_status(driver: uc.Chrome) -> str:
+    """
+    Determines the current microphone mute status.
+    """
     try:
         mic_off_buttons = driver.find_elements(
             By.XPATH, "//button[@aria-label='Turn off microphone']"
@@ -126,9 +131,11 @@ def find_mute_status(driver):
         print(f"Error checking mute status: {e}")
         return "unknown"
     
-def find_video_status(driver):
+def find_video_status(driver: uc.Chrome) -> str:
+    """
+    Determines the current camera video status.
+    """
     try:
-        # Check if video is on
         video_off_buttons = driver.find_elements(
             By.XPATH, "//button[@aria-label='Turn off camera']"
         )

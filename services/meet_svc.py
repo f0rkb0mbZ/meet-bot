@@ -13,7 +13,7 @@ from models.models import Layout
 
 def join_google_meet(driver: uc.Chrome, bot_name: str, meet_url: str):
     """
-    Join a Google Meet session using provided webdriver
+    Join a Google Meet session using provided webdriver, bot name and meeting url
     """
     try:
         # Navigate to the Google Meet URL
@@ -81,7 +81,10 @@ def join_google_meet(driver: uc.Chrome, bot_name: str, meet_url: str):
         print(f"An error occurred: {e}")
 
 
-def check_if_joined(driver, bot_name: str):
+def check_if_joined(driver: uc.Chrome, bot_name: str) -> bool:
+    """
+    Checks if the bot has successfully joined the meeting by looking for its name in the participants list.
+    """
     # Wait for 10 minutes to confirm that the host accepted the bot
     people_button = WebDriverWait(driver, timeout=600, poll_frequency=5).until(
         EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='People']"))
@@ -114,11 +117,14 @@ def check_if_joined(driver, bot_name: str):
     return joined
 
 
-def toggle_mute_state(driver):
+def toggle_mute_state(driver: uc.Chrome) -> str:
+    """
+    Toggles the microphone mute state using keyboard shortcut (Ctrl+D).
+    """
     # Clear any "Got it" dialogs, so that elements are clickable
     clear_got_it_dialogs(driver)
 
-    # Focus on the Google Meet window
+    # Use keyboard shortcut to toggle mute state
     action = ActionChains(driver)
     action.key_down(Keys.CONTROL).send_keys("d").key_up(Keys.CONTROL).perform()
 
@@ -128,11 +134,14 @@ def toggle_mute_state(driver):
     return find_mute_status(driver)
 
 
-def toggle_video_state(driver):
+def toggle_video_state(driver: uc.Chrome) -> str:
+    """
+    Toggles the camera video state using keyboard shortcut (Ctrl+E).
+    """
     # Clear any "Got it" dialogs, so that elements are clickable
     clear_got_it_dialogs(driver)
 
-    # Focus on the Google Meet window
+    # Use keyboard shortcut to toggle video state
     action = ActionChains(driver)
     action.key_down(Keys.CONTROL).send_keys("e").key_up(Keys.CONTROL).perform()
 
@@ -142,7 +151,10 @@ def toggle_video_state(driver):
     return find_video_status(driver)
 
 
-def change_meeting_layout(driver, layout: Layout):
+def change_meeting_layout(driver: uc.Chrome, layout: Layout) -> None:
+    """
+    Changes the Google Meet layout to the specified option.
+    """
     # Clear any "Got it" dialogs, so that elements are clickable
     clear_got_it_dialogs(driver)
 
@@ -165,7 +177,7 @@ def change_meeting_layout(driver, layout: Layout):
     layout_option = None
     for item in menu_items:
         try:
-            # Find any span containing the text "Change layout" regardless of class
+            # Find any span containing the text "Change layout"
             span_elements = item.find_elements(By.XPATH, ".//span")
             for span in span_elements:
                 if span.text.strip().lower() == "change layout":
@@ -221,7 +233,10 @@ def change_meeting_layout(driver, layout: Layout):
     driver.save_screenshot("screenshots/change_layout/4_close_button.png")
 
 
-def send_chat_message(driver, message: str):
+def send_chat_message(driver: uc.Chrome, message: str) -> None:
+    """
+    Sends a chat message to all participants in the meeting.
+    """
     # Clear any "Got it" dialogs, so that elements are clickable
     clear_got_it_dialogs(driver)
 
@@ -253,7 +268,10 @@ def send_chat_message(driver, message: str):
     time.sleep(1)
 
 
-def exit_meeting(driver):
+def exit_meeting(driver: uc.Chrome) -> None:
+    """
+    Leaves the current Google Meet session.
+    """
     # Clear any "Got it" dialogs, so that elements are clickable
     clear_got_it_dialogs(driver)
 
