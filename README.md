@@ -128,18 +128,18 @@ Then, we need to spin up the server:
 fastapi run api.py
 ```
 Lastly, spin up the CLI:
-```
+```bash
 python cli.py console
 ```
 ### CLI Docs
 
-#### Main commands
+#### List of available commands
 ```bash
 python cli.py --help
                                                                                                                                                                                             
  Usage: cli.py [OPTIONS] COMMAND [ARGS]...                                                                                                                                                  
                                                                                                                                                                                             
- A console-like CLI built with Typer and WebSocket support.                                                                                                                                 
+ Meetbot CLI with WebSocket support.                                                                                                                                 
                                                                                                                                                                                             
                                                                                                                                                                                             
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
@@ -157,6 +157,22 @@ python cli.py --help
 │ create-screenshot   Create a screenshot of the current window.                                                                                                                           │
 │ console             Launch Meetbot CLI session with WebSocket logging.                                                                                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+#### `console` subcommand
+```bash
+python cli.py console --help
+                                                                                                                                                                                       
+ Usage: cli.py console [OPTIONS]                                                                                                                                                       
+                                                                                                                                                                                       
+ Launch Meetbot CLI session with WebSocket logging.                                                                                                                                    
+                                                                                                                                                                                       
+                                                                                                                                                                                       
+╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --api-url        TEXT  API server URL to connect to. [default: http://localhost:8000]                                                                                               │
+│ --ws-url         TEXT  WebSocket server URL to connect to. [default: ws://localhost:8000/events]                                                                                    │
+│ --help                 Show this message and exit.                                                                                                                                  │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 #### `join-meeting` subcommand

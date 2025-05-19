@@ -17,7 +17,7 @@ class Layout(str, Enum):
 API_BASE_URL = "http://localhost:8000"
 WS_URL = "ws://localhost:8000/events"
 
-app = typer.Typer(help="A console-like CLI built with Typer and WebSocket support.")
+app = typer.Typer(help="Meetbot CLI with WebSocket support.")
 
 @app.command()
 def join_meeting(
@@ -134,6 +134,10 @@ def console(
 
     def on_open(ws):
         print(f"[blue]Connected to WS server: {ws_url}[/blue]")
+
+    # Set the API base URL to global variable
+    global API_BASE_URL
+    API_BASE_URL = api_url
 
     # Start WebSocket in background thread
     ws_app = websocket.WebSocketApp(
