@@ -19,6 +19,9 @@ A google meet bot with Selenium, FastAPI and Undetected Chromedriver, with a typ
 - ✅ Participant has left the meeting
 - ✅ Completion events for all the server commands
 
+### Bonus
+- ✅ Play any video stream from the internet to the virtual camera
+
 ### Video Demo
 
 [![meetbot-demo](https://r2.snehangshu.dev/meetbot-demo-thumbnail.jpg)](https://r2.snehangshu.dev/meetbot-demo.mp4)
